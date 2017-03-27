@@ -4,6 +4,7 @@ namespace Thunder33345\DiscordLogger;
 
 class DiscordHook
 {
+  public static function null() { }
 
   public static function send(Message $message,array $curlOpts = [])
   {

@@ -25,12 +25,13 @@ class Loader extends PluginBase
 
   public function onEnable()
   {
+    DiscordHook::null();//hack to load the whole file
     //On Enabled Called
     if(self::$started == true) {//is reload
-      $this->debugMsg("Server Reloaded");
+      $this->debugMsg("[Event] Server Reloaded");
       $this->send(self::reload);
     } else {//server started
-      $this->debugMsg("Server Started");
+      $this->debugMsg("[Event] Server Started");
       $this->send(self::start);
       set_error_handler([$this,'handleError'],E_ALL);
       register_shutdown_function([$this,'shutdown']);
@@ -45,19 +46,19 @@ class Loader extends PluginBase
   public function onDisable()
   {
     if($this->getServer()->isRunning() == true) { //prepare reload OR plugin crashed
-      $this->debugMsg("Server Prepare Reload / Plugin Crashed");
+      $this->debugMsg("[Event] Server Prepare Reload / Plugin Crashed");
       $this->send(self::prepReload);
     } else { //server stopping
-      $this->debugMsg("Server Stopping");
+      $this->debugMsg("[Event] Server Stopping");
       $this->send(self::stop);
     }
   }
 
-  private function debugMsg($msg)
+  public function debugMsg($msg)
   {
     if($this->debug) {
       if(is_object($msg)) $msg = print_r($msg,true);
-      $this->getLogger()->notice(" DEBUG: ".$msg);
+      $this->getLogger()->notice("DEBUG: ".$msg);
     }
   }
 
@@ -77,18 +78,22 @@ class Loader extends PluginBase
         $color = hexdec('#e8f329');
         break;
       case self::stop:
+        $now = true;
         $desc = "[Server] Stopping";
         $color = hexdec('#e10202');
         break;
       case self::phpStop:
+        $now = true;
         $desc = "[PHP] Shutting Down";
         $color = hexdec('#e10202');
         break;
       case self::phpError:
+        $now = true;
         $desc = "[PHP] Error\n```".print_r($error,true)."```";
         $color = hexdec("#ff0000");
         break;
       case self::phpCrash:
+        $now = true;
         $desc = "[PHP] Crash\n```".print_r($error,true)."```";
         $color = hexdec("#ff0000");
         break;
@@ -106,7 +111,7 @@ class Loader extends PluginBase
             $desc .= "\n";
           }
           $desc .= "```";
-        } else $desc .= "No Players!";
+        }
         $color = hexdec('#20ff00');
         break;
       default:
@@ -114,14 +119,19 @@ class Loader extends PluginBase
         break;
     }
     $key = false;//if your PHP have no cert access
-    $url = '';
-    $dh = DiscordHook::send(
-     new Message(
-      new User($url,"Server Logger"),"",
-      [new Embed(null,$desc,null,$color)]),
-     [CURLOPT_SSL_VERIFYHOST => $key,CURLOPT_SSL_VERIFYPEER => $key]
-    );
-    $this->debugMsg("Response for ".'"'.$desc.'"'." : ".'"'.print_r($dh,true).'');
+    $url = 'https://discordapp.com/api/webhooks/293003011314155521/4-EUhe5pxfqM2ZC1hWIDqUltqTTfatdGfuRwjR680z2mK1eBTirNNkFN14akXC3lul06';
+
+    $message = new Message(
+     new User($url,"Server Logger"),"",
+     [new Embed(null,$desc,null,$color)]);
+    $curlOpts = [CURLOPT_SSL_VERIFYHOST => $key,CURLOPT_SSL_VERIFYPEER => $key];
+    if(isset($now) and $now == true) {
+      $result = DiscordHook::send($message,$curlOpts);
+      $this->debugMsg("[Response](now) '".$desc."' : ".print_r($result,true));
+    } else {
+      $task = new SendTask($desc,$message,$curlOpts);
+      $this->getServer()->getScheduler()->scheduleAsyncTask($task);
+    }
   }
 
   public function handlePing($pwd)
@@ -135,7 +145,7 @@ class Loader extends PluginBase
     foreach($players as $player){
       $info['players'][] = [$player->getName(),$player->getDisplayName()];
     }
-    $this->debugMsg("Ping! ".print_r($info));
+    $this->debugMsg("[Ping] ".print_r($info,true));
     $this->send(self::ping,$info);
   }
 
